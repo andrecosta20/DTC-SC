@@ -15,25 +15,29 @@ contract CDSC {
   uint256 public _signedDataOfPurchaser;
 
   modifier onlySupplier() {
-    require (msg.sender == _supplier);
+    require(msg.sender == _supplier, "Only the supplier can perform this action.");
     _;
   }
 
   modifier onlyPurchaser() {
-    require (msg.sender == _purchaser);
+    require(msg.sender == _purchaser, "Only the purchaser can perform this action.");
     _;
   }
 
-  constructor() public {
-    _purchaser = 0x00bFAA40777963f2324e1f5b3e0f427FEa8f4ac7;
-    _supplier = 0x00225D5aC189405947e027ddd6c5C6CCf9ED8972;
-	_center = 0x62b1e832130672CfeD8CAb10c0919993a505b311;
+  // Novo construtor para permitir a configuração dinâmica dos endereços
+  constructor(
+    address purchaser,
+    address supplier,
+    address center
+  ) public {
+    _purchaser = purchaser;
+    _supplier = supplier;
+    _center = center;
     _resourceName = "BigData";
     _resourceNumber = 2020215;
     _purchaserName = "SHU";
     _purchaserPurpose = "Research";
     _commitment = "After negotiation, the purchaser and the supplier sign the following data resource purchase agreement based on the principle of equality and mutual benefit.";
-
   }
 
   event priceNegotiated(string info, address supplier, uint resourceNumber);
