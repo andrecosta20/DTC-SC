@@ -17,6 +17,17 @@ contract DTSC {
   }
 
   mapping(address => Purchaser) public DPs;
+  mapping(address => uint) public ratings;
+
+  // Estrutura para rastrear transações
+  struct Transaction {
+    address purchaser;
+    address supplier;
+    uint value;
+    string status; // Exemplo: "Successful", "Refunded", "Disputed"
+  }
+
+  Transaction[] public transactions; // Lista de transações
 
   modifier DPCost() {
     require(msg.value == dataprice + deposit, "Incorrect value sent.");
@@ -59,6 +70,11 @@ contract DTSC {
     numberOfSuccessfulSales = 0;
   }
 
+  function rateUser(address user, uint score) public { // Adicionado
+        require(score <= 5, "Max rating is 5.");
+        ratings[user] = (ratings[user] + score) / 2;
+    }
+  
   event DSDeposited(string info, address DS);
   event DPDepositedandPaid(address DP, string info);
   event successfulTrading(address DP);
@@ -69,6 +85,21 @@ contract DTSC {
   event refundDone(address DP);
   event paymentSettled(address DP, string info);
   event RefundBasedOnDPRequest(string info, address DP);
+
+  // Função para rastrear transações
+  function recordTransaction(
+    address _purchaser,
+    address _supplier,
+    uint _value,
+    string memory _status
+  ) internal {
+    transactions.push(Transaction({
+      purchaser: _purchaser,
+      supplier: _supplier,
+      value: _value,
+      status: _status
+    }));
+  }
 
   function RequestSellData() OnlyDS DSCost public payable {
     emit DSDeposited("Selling data", ds);
@@ -87,6 +118,9 @@ contract DTSC {
     msg.sender.transfer(x);
     DPs[msg.sender].status = DPStatus.Refunded;
     emit RefundBasedOnDPRequest("DP has been refunded", msg.sender);
+
+    // Registro da transação
+    recordTransaction(msg.sender, ds, x, "Refunded");
   }
 
   function ConfirmResult(bool result) OnlyDP public {
@@ -95,10 +129,16 @@ contract DTSC {
       emit successfulTrading(msg.sender);
       DPs[msg.sender].status = DPStatus.SuccessfulTrading;
       settlepayment(msg.sender);
+
+      // Registro da transação
+      recordTransaction(msg.sender, ds, dataprice + deposit, "Successful");
     } else {
       emit unsuccessfulTrading(msg.sender);
       DPs[msg.sender].status = DPStatus.Unsatisfied;
       emit DTCArbitrationThroughDTCSC(msg.sender, "DTC is involved in dispute arbitration.");
+
+      // Registro da transação
+      recordTransaction(msg.sender, ds, dataprice + deposit, "Disputed");
     }
   }
 
@@ -110,10 +150,16 @@ contract DTSC {
       dtc.transfer(deposit);
       emit refundDone(DP);
       DPs[DP].status = DPStatus.TradingCompleted;
+
+      // Registro da transação
+      recordTransaction(DP, ds, dataprice + deposit, "Refunded");
     } else {
       emit DPWrong(DP, "DP is Wrong.");
       DPs[DP].status = DPStatus.DPIsWrong;
       settlepayment(DP);
+
+      // Registro da transação
+      recordTransaction(DP, ds, dataprice + deposit, "Settled");
     }
   }
 
@@ -129,5 +175,11 @@ contract DTSC {
     DP.transfer(deposit);
     emit paymentSettled(DP, "Payment settled");
     DPs[DP].status = DPStatus.TradingCompleted;
+  }
+
+  // Recuperar transações
+  function getTransaction(uint index) public view returns (address, address, uint, string memory) {
+    Transaction memory txn = transactions[index];
+    return (txn.purchaser, txn.supplier, txn.value, txn.status);
   }
 }
